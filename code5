@@ -1,0 +1,124 @@
+This is my schema. Refer to this and produce queries for the following prompts.
+CREATE TABLE l2_loans_sch.business_date (
+    bd_id integer NOT NULL ENCODE az64,
+    business_date date NOT NULL ENCODE az64,
+    PRIMARY KEY (bd_id)
+) DISTSTYLE ALL;
+
+
+CREATE TABLE l2_loans_sch.dim_branch (
+    channel_key bigint ENCODE az64,
+    region_code character varying(50) ENCODE lzo,
+    officer_name character varying(255) ENCODE lzo,
+    channel_type character varying(100) ENCODE lzo
+) DISTSTYLE AUTO;
+
+CREATE TABLE l2_loans_sch.dim_customer (
+    customer_key bigint ENCODE raw
+    distkey
+,
+        customer_id character varying(50) ENCODE lzo,
+        full_name character varying(255) ENCODE lzo,
+        annual_income numeric(18, 2) ENCODE az64,
+        income_bracket character varying(50) ENCODE lzo,
+        state_code character varying(5) ENCODE lzo,
+        kyc_status character varying(50) ENCODE lzo,
+        state_name character varying(1000) ENCODE lzo
+) DISTSTYLE AUTO
+
+
+CREATE TABLE l2_loans_sch.dim_date (
+    date_key integer ENCODE az64,
+    full_date date ENCODE az64,
+    month_name character varying(20) ENCODE lzo,
+    is_last_month character(1) ENCODE lzo
+) DISTSTYLE AUTO;
+
+CREATE TABLE l2_loans_sch.dim_loan_master_2 (
+    loan_key integer ENCODE raw,
+    loan_id character varying(256) ENCODE lzo
+    distkey
+,
+        application_id character varying(256) ENCODE lzo,
+        loan_term_months integer ENCODE az64,
+        interest_rate numeric(18, 0) ENCODE az64,
+        rate_type character varying(256) ENCODE lzo,
+        risk_category character varying(256) ENCODE lzo,
+        account_status character varying(256) ENCODE lzo
+) DISTSTYLE AUTO
+
+CREATE TABLE l2_loans_sch.dim_product (
+    product_key bigint ENCODE az64,
+    product_name character varying(100) ENCODE lzo,
+    loan_purpose character varying(100) ENCODE lzo
+) DISTSTYLE AUTO;
+
+CREATE TABLE l2_loans_sch.dim_property (
+    property_key bigint ENCODE raw,
+    loan_key bigint ENCODE az64
+    distkey
+,
+        state_code character varying(5) ENCODE lzo,
+        property_type character varying(50) ENCODE lzo,
+        occupancy_type character varying(50) ENCODE lzo
+) DISTSTYLE AUTO
+SORTKEY
+    (property_key);
+
+CREATE TABLE l2_loans_sch.dim_status_ref (
+    status_key bigint ENCODE az64,
+    application_status character varying(50) ENCODE lzo
+) DISTSTYLE AUTO;
+
+
+CREATE TABLE l2_loans_sch.fact_application (
+    application_id character varying(50) ENCODE lzo,
+    customer_key bigint ENCODE az64
+    distkey
+,
+        product_key bigint ENCODE az64,
+        date_key integer ENCODE az64,
+        channel_key bigint ENCODE az64,
+        status_key bigint ENCODE az64,
+        loan_amount_requested numeric(18, 2) ENCODE az64,
+        loan_amount_approved numeric(18, 2) ENCODE az64
+) DISTSTYLE AUTO
+
+
+
+
+CREATE TABLE l2_loans_sch.fact_disbursement (
+    disbursement_id character varying(50) ENCODE lzo,
+    loan_key bigint ENCODE raw
+    distkey
+,
+        date_key integer ENCODE az64,
+        disbursed_amount numeric(18, 2) ENCODE az64
+) DISTSTYLE AUTO
+
+
+CREATE TABLE l2_loans_sch.fact_repayment (
+    repayment_event_id character varying(50) ENCODE lzo,
+    loan_key bigint ENCODE raw
+    distkey
+,
+        date_key integer ENCODE az64,
+        principal_amount numeric(18, 2) ENCODE az64,
+        interest_amount numeric(18, 2) ENCODE az64,
+        late_fee_amount numeric(18, 2) ENCODE az64,
+        total_transaction_amount numeric(18, 2) ENCODE az64,
+        is_first_repayment boolean ENCODE raw
+) DISTSTYLE AUTO
+
+
+Prompts:
+How many mortgage customers have missed their repayment in the last month.
+How many of these loan applications were closed within the last 6 months. Show the numbers by month.
+What is the trend of missed payments over the last 6 months.
+What is the channel-wise variation of this trend.
+What is the %age contribution to mortgage loans by area/ zip code.
+What is the contribution to the mortgage portfolio by various income categories.
+What is the contribution of prime and sub-prime loans to the mortgage portfolio.
+What is the state wise %age of total mortgage applications submitted over the last one year.
+How is the application submission growing for the states over the past 3 years.
+What is the conversion rate of the submitted applications by state.
