@@ -1,4 +1,4 @@
-TEMP TABLE
+---TEMP TABLE-----
 SYNTAX (SQL SERVER)
 SELECT
 INTO #NEW_TABLE_NAME
@@ -8,10 +8,16 @@ WHERE
 USED IN ETL ,
 
 COMPARISON:
-               SUBQUERY          CTE             TEMP           CTAS          VIEW
-STORAGE         MEMORY            MEMORY         DISK            DISK        NO STORAGE
-LIFE TIME       TEMPORARY        TEMPORARY      TEMPORARY        PERMANENT    PERMANENT
-WHEN DELETED    END OF QUERY     END OF QUERY   END OF SESSION    DDL DROP    DDL DROP
-SCOPE           SINGLE-QUERY     SINGLE-QUERY   |-----------SINGLE-QUERY------------|
-REUSEABILITY    LIMITED          LIMITED        MEDIUM
-                (1 PLACE 1 QUERY) (MULTI PLACE 1 QUERY)
+               SUBQUERY          CTE                       TEMP           CTAS          VIEW
+STORAGE         MEMORY            MEMORY                   DISK            DISK        NO STORAGE
+LIFE TIME       TEMPORARY        TEMPORARY                 TEMPORARY        PERMANENT    PERMANENT
+WHEN DELETED    END OF QUERY     END OF QUERY              END OF SESSION    DDL DROP    DDL DROP
+SCOPE           SINGLE-QUERY     SINGLE-QUERY              |-----------multi-QUERY------------|
+REUSEABILITY    LIMITED          LIMITED                   MEDIUM          high              high
+                (1 PLACE 1 QUERY) (MULTI PLACE 1 QUERY)    (multi query during session) 
+is data up to date   yes            yes                      no              no              yes
+
+---STORED PROCEDURE-----
+CREATE PROCEDURE NAME AS 
+BEGIN
+END
