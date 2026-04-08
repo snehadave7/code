@@ -1,1 +1,17 @@
+Composite index rule
+LEFTMOST PREFIX RULE:Index works only if your query filters start from the fisr column in the index 
+and follow its order.
+
+2)STORAGE:
+1)ROWSTORE INDEX: IT store data row by row in a data page.
+2)COLUMNSTORE INDEX: IT store data column by column in a data page
+
+COLUMNSTORE IS MUCH FASTER THAN ROWSTORE, WHY?
+COLUMNSTORE PROCESS:
+1)Generally data is stored in heap i.e Row groups. 
+2)Column segment takes place on top of that row group.
+3)Third step is COMPRESSION-> It creates a dictionary.For ex, wehave a column status with 2 filed active and inactive. It replaces the words with smaller value like 1,2, 
+and then store it in a datastream [1,2,1,2,1,2].
+4)Store-> It uses LOB LARGE OBJECT PAGE.
+
 
