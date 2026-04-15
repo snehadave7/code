@@ -11,3 +11,10 @@ GET META DATA CAPABILITES
 3) Get the column count.
 4) Get the size of file
 5) Get the last modified datetime of a file
+
+SET VARIABLE
+1) It allows to set a variable value and if u debug u can see the the number in output.
+FOR EACH ACTIVITY
+1)If you want to run in a sequence tick on sequential, if u want parallel, untick it and batch count is like if u put 2, 2 items at a time will run parallel.
+COPY EACH FILE TO A NEW TABLE
+1) GET METADATA(TO GET ALL THE FILES)
