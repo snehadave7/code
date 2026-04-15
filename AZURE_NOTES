@@ -4,3 +4,10 @@ COPY DATA
 1) IF U WANT TO COPY ALL FILES IN A FOLDER -> USE Wildcard file path IN File path type INSIDE SOURCE. THEN PUT * IN THE WILDCARD FILE NAME, THIS WILL COPY ENTIRE FILES IN THE FOLDER.
 2) IF U WANT TO COPY SPECIFIC FILES STARTING WITH SAME NAMES -> EXAMPLE SALES*.* ->.* MEANS ANY EXTENSION
 3) IF U WANT TO COPY FILES WITH SPECFIC EXTENSTION-> *.CSV
+
+GET META DATA CAPABILITES
+1) You need to check if the file/folder exists
+2) Get all files/folder from a target folder.
+3) Get the column count.
+4) Get the size of file
+5) Get the last modified datetime of a file
