@@ -23,3 +23,6 @@ Pre-Copy Script-> write script that u want to run before copying data into the d
 
 COPY DATA WITH UPSERT
 1) We need a key column to identify if the key column exists or not.
+
+LOOKUP 
+1) This will output the whole data present in any file/table using query/sp/ just file path like that....
