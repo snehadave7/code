@@ -26,3 +26,6 @@ COPY DATA WITH UPSERT
 
 LOOKUP 
 1) This will output the whole data present in any file/table using query/sp/ just file path like that....
+
+EXECUTE PIPELINE: 
+1)This will allow us to invoke pipelines
