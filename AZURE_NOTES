@@ -1,4 +1,4 @@
-AZURE DATA FACTORY
+AZURE DATA FACTORY/ AZURE SYNAPSE ANALYTICS
 COPY DATA
 
 1) IF U WANT TO COPY ALL FILES IN A FOLDER -> USE Wildcard file path IN File path type INSIDE SOURCE. THEN PUT * IN THE WILDCARD FILE NAME, THIS WILL COPY ENTIRE FILES IN THE FOLDER.
@@ -29,3 +29,13 @@ LOOKUP
 
 EXECUTE PIPELINE: 
 1)This will allow us to invoke pipelines
+
+==============================================================DATA FLOW=================================================================================
+1) It allows to do actual transformations like adding columns, doing aggregations etc.
+2) Under projection detect correct datatype before writing as by default csv will take string as datatype.
+3) Data preview allows to view the changes without running
+4) Every dataflow must have a source and sink
+
+1) SELECT TRANSFORMATION:
+This is allow us to just select the column of a table
+
