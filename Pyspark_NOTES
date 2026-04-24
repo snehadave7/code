@@ -1,0 +1,2 @@
+CLUSTER: It is a group of machines connected through network.
+SPARK:In-memory processing engine->it doesnt store any data, it reads from somewhere take it into memory and write it somewhere.
