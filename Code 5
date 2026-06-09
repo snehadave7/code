@@ -1,27 +1,3 @@
-Relational Database
+Would like you to explore advanced topics on how the dv would scale 1k, 10k, 100k nodes, indexing strategies
 
-Neo4j Graph Database
-
-Multiple JOINs required
-
-Direct relationship traversal
-
-Query complexity grows with data
-
-Queries remain intuitive
-
-Hard to visualize connections
-
-Native graph visualization
-
-Slower for multi-hop analysis
-
-Optimized for connected data
-
-
-Neo4j simplifies relationship discovery by storing connections directly, enabling faster and more intuitive analysis of connected data
-SQL vs Neo4j: Relationship Analysis
-
-Business Question
-
-“How are customers connected through shared addresses, phones, and accounts?”
+Please explore on the DB options available (local vs aura). 
