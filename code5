@@ -1,124 +1,113 @@
-This is my schema. Refer to this and produce queries for the following prompts.
-CREATE TABLE l2_loans_sch.business_date (
-    bd_id integer NOT NULL ENCODE az64,
-    business_date date NOT NULL ENCODE az64,
-    PRIMARY KEY (bd_id)
-) DISTSTYLE ALL;
+USE [PenFed_Raw_PII]
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE PROCEDURE [dbo].[sp_Master_Transfer_Xref_Daily]
+AS
+DECLARE @UnionStatement		VARCHAR(MAX)
+DECLARE @CreationStatement	VARCHAR(MAX)
+DECLARE @XrefStatement		VARCHAR(MAX)
+DECLARE @PeriodID			VARCHAR(8) = convert(varchar(8),cast(GETDATE()-1 as date),112)
+DECLARE @PeriodMTH			VARCHAR(6) = convert(varchar(6),cast(GETDATE()-1 as date),112)
+SELECT @UnionStatement = CASE WHEN @UnionStatement IS NULL 
+                 THEN 'SELECT CAST('''+SUBSTRING(TABLE_NAME, 14, 8)+''' AS INT) AS PeriodDate, * FROM '
+                 ELSE @UnionStatement + 'UNION ALL SELECT CAST('''+SUBSTRING(TABLE_NAME, 14, 8)+''' AS INT) AS PeriodDate, * FROM ' END +
+              '' + TABLE_CATALOG +'.dbo.'+ TABLE_NAME +
+              CHAR(13) + CHAR(10)
+   FROM PenFed_Raw_PII.INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME LIKE 'Raw_Transfer_'+@PeriodID+'_BANK75'
+   ORDER BY Table_Name
 
+SET @CreationStatement ='
 
-CREATE TABLE l2_loans_sch.dim_branch (
-    channel_key bigint ENCODE az64,
-    region_code character varying(50) ENCODE lzo,
-    officer_name character varying(255) ENCODE lzo,
-    channel_type character varying(100) ENCODE lzo
-) DISTSTYLE AUTO;
+IF OBJECT_ID(''PenFed_Raw_PII.dbo.Raw_Transfer_Daily_Temp_'+@PeriodID+''',''U'') IS NOT NULL
+DROP TABLE PenFed_Raw_PII.dbo.Raw_Transfer_Daily_Temp_'+@PeriodID+';
+	
+SELECT   
+IDENTITY(INT, 1, 1)																			AS [TransferUniqueId]
+--,CAST( AS INT)																	AS BankId														       
+,CAST('+@PeriodID+' AS INT)																	AS PeriodId                
+--,CAST('+@PeriodID+' AS INT)														AS BankPeriod												       
+, ISNULL(CAST(CAST(''75'' + REPLICATE(''0'',16) AS NUMERIC(18,0))	
+        + CAST(CASE	
+                  WHEN ISNUMERIC(LTRIM(RTRIM(A.CHD_ACCOUNT_NUMBER_NEW))) != 0	
+                       AND LTRIM(RTRIM(A.CHD_ACCOUNT_NUMBER_NEW)) NOT IN (''.'','''') THEN	
+                        LTRIM(RTRIM(A.CHD_ACCOUNT_NUMBER_NEW))	
+                  ELSE NULL
+               END AS NUMERIC(18,0)) AS NUMERIC(18,0)),0)									AS AccountId_New
+,ISNULL(CAST(CAST(''75'' + REPLICATE(''0'',16) AS NUMERIC(18,0))	
+        + CAST(CASE	
+                  WHEN ISNUMERIC(LTRIM(RTRIM(A.CHD_ACCOUNT_NUMBER_OLD))) != 0	
+                       AND LTRIM(RTRIM(A.CHD_ACCOUNT_NUMBER_OLD)) NOT IN (''.'','''') THEN	
+                        LTRIM(RTRIM(A.CHD_ACCOUNT_NUMBER_OLD))	
+                  ELSE NULL
+               END AS NUMERIC(18,0)) AS NUMERIC(18,0)),0)									AS AccountId_Old                 
+,A.*
+INTO PenFed_Raw_PII.dbo.Raw_Transfer_Daily_Temp_'+@PeriodID+'
+FROM 
+(
+'+@UnionStatement+'
+) A
+WHERE LTRIM(RTRIM(A.COMPANY_CARD)) = ''N''
 
-CREATE TABLE l2_loans_sch.dim_customer (
-    customer_key bigint ENCODE raw
-    distkey
-,
-        customer_id character varying(50) ENCODE lzo,
-        full_name character varying(255) ENCODE lzo,
-        annual_income numeric(18, 2) ENCODE az64,
-        income_bracket character varying(50) ENCODE lzo,
-        state_code character varying(5) ENCODE lzo,
-        kyc_status character varying(50) ENCODE lzo,
-        state_name character varying(1000) ENCODE lzo
-) DISTSTYLE AUTO
+ALTER TABLE PenFed_Raw_PII.dbo.Raw_Transfer_Daily_Temp_'+@PeriodID+'
+REBUILD PARTITION = ALL WITH (DATA_COMPRESSION = PAGE)
+'
+EXEC (@CreationStatement)
+DELETE dbo.Master_Transfer_Xref_Daily WHERE Periodid = @Periodid
+SET @XrefStatement = '
 
+WITH Tree
+  AS (
+      -- Transfers Linked To Existing Parent Accounts
+      SELECT A.ParentAccountID AS ParentAccountId
+           , A.AccountId_New AS AccountId_Old
+           , B.AccountId_New
+           , B.CHD_ACCT_TRANSFER_DATE AS AcctTransferDate
+        FROM dbo.Master_Transfer_Xref_Daily AS A
+       INNER JOIN dbo.Raw_Transfer_Daily_Temp_'+@PeriodID+' AS B
+          ON A.AccountId_New = B.AccountId_Old
+       WHERE A.PeriodID < '+@PeriodMTH+'
+       UNION ALL
+      -- Transfers With New Parent Accounts
+      SELECT A.AccountId_Old AS ParentAccountId
+           , A.AccountId_Old
+           , A.AccountId_New
+           , A.CHD_ACCT_TRANSFER_DATE AS AcctTransferDate
+        FROM dbo.Raw_Transfer_Daily_Temp_'+@PeriodID+' AS A
+        LEFT OUTER JOIN dbo.Master_Transfer_Xref_Daily AS B
+          ON A.AccountId_Old = B.AccountId_New
+        LEFT OUTER JOIN dbo.Raw_Transfer_Daily_Temp_'+@PeriodID+' AS C
+          ON A.AccountId_Old = C.AccountId_New
+       WHERE B.ParentAccountID IS NULL
+         AND C.TransferUniqueId IS NULL
+       UNION ALL
+      -- Multiple Transfers Within A Single Period
+      SELECT P.ParentAccountId AS ParentAccountId
+           , P.AccountId_New AS AccountId_Old
+           , C.AccountId_New AS AccountId
+           , C.CHD_ACCT_TRANSFER_DATE AS AcctTransferDate
+        FROM Tree AS P
+       INNER JOIN dbo.Raw_Transfer_Daily_Temp_'+@PeriodID+' AS C
+          ON P.AccountId_New = C.AccountId_Old
+      )
+INSERT INTO dbo.Master_Transfer_Xref_Daily (BankID, PeriodID, BankPeriod, ParentAccountID, AccountId_Old, AccountId_New, CHD_ACCT_TRANSFER_DATE)
+SELECT 75 AS BankID
+     , '+@PeriodID+' AS PeriodID
+     , 75'+@PeriodMTH+' AS BankPeriod
+     , Tree.ParentAccountId
+     , Tree.AccountId_Old
+     , Tree.AccountId_New
+     , Tree.AcctTransferDate AS CHD_ACCT_TRANSFER_DATE
+  FROM Tree
+  LEFT OUTER JOIN dbo.Master_Transfer_Xref_Daily AS MTX
+    ON Tree.AccountId_Old = MTX.AccountId_Old
+   AND Tree.AccountId_New = MTX.AccountId_New
+WHERE MTX.AccountId_Old IS NULL
+IF OBJECT_ID(''PenFed_Raw_PII.dbo.Raw_Transfer_Daily_Temp_'+@PeriodID+''',''U'') IS NOT NULL
+DROP TABLE PenFed_Raw_PII.dbo.Raw_Transfer_Daily_Temp_'+@PeriodID+';
+'
+EXEC (@XrefStatement)
+GO
 
-CREATE TABLE l2_loans_sch.dim_date (
-    date_key integer ENCODE az64,
-    full_date date ENCODE az64,
-    month_name character varying(20) ENCODE lzo,
-    is_last_month character(1) ENCODE lzo
-) DISTSTYLE AUTO;
-
-CREATE TABLE l2_loans_sch.dim_loan_master_2 (
-    loan_key integer ENCODE raw,
-    loan_id character varying(256) ENCODE lzo
-    distkey
-,
-        application_id character varying(256) ENCODE lzo,
-        loan_term_months integer ENCODE az64,
-        interest_rate numeric(18, 0) ENCODE az64,
-        rate_type character varying(256) ENCODE lzo,
-        risk_category character varying(256) ENCODE lzo,
-        account_status character varying(256) ENCODE lzo
-) DISTSTYLE AUTO
-
-CREATE TABLE l2_loans_sch.dim_product (
-    product_key bigint ENCODE az64,
-    product_name character varying(100) ENCODE lzo,
-    loan_purpose character varying(100) ENCODE lzo
-) DISTSTYLE AUTO;
-
-CREATE TABLE l2_loans_sch.dim_property (
-    property_key bigint ENCODE raw,
-    loan_key bigint ENCODE az64
-    distkey
-,
-        state_code character varying(5) ENCODE lzo,
-        property_type character varying(50) ENCODE lzo,
-        occupancy_type character varying(50) ENCODE lzo
-) DISTSTYLE AUTO
-SORTKEY
-    (property_key);
-
-CREATE TABLE l2_loans_sch.dim_status_ref (
-    status_key bigint ENCODE az64,
-    application_status character varying(50) ENCODE lzo
-) DISTSTYLE AUTO;
-
-
-CREATE TABLE l2_loans_sch.fact_application (
-    application_id character varying(50) ENCODE lzo,
-    customer_key bigint ENCODE az64
-    distkey
-,
-        product_key bigint ENCODE az64,
-        date_key integer ENCODE az64,
-        channel_key bigint ENCODE az64,
-        status_key bigint ENCODE az64,
-        loan_amount_requested numeric(18, 2) ENCODE az64,
-        loan_amount_approved numeric(18, 2) ENCODE az64
-) DISTSTYLE AUTO
-
-
-
-
-CREATE TABLE l2_loans_sch.fact_disbursement (
-    disbursement_id character varying(50) ENCODE lzo,
-    loan_key bigint ENCODE raw
-    distkey
-,
-        date_key integer ENCODE az64,
-        disbursed_amount numeric(18, 2) ENCODE az64
-) DISTSTYLE AUTO
-
-
-CREATE TABLE l2_loans_sch.fact_repayment (
-    repayment_event_id character varying(50) ENCODE lzo,
-    loan_key bigint ENCODE raw
-    distkey
-,
-        date_key integer ENCODE az64,
-        principal_amount numeric(18, 2) ENCODE az64,
-        interest_amount numeric(18, 2) ENCODE az64,
-        late_fee_amount numeric(18, 2) ENCODE az64,
-        total_transaction_amount numeric(18, 2) ENCODE az64,
-        is_first_repayment boolean ENCODE raw
-) DISTSTYLE AUTO
-
-
-Prompts:
-How many mortgage customers have missed their repayment in the last month.
-How many of these loan applications were closed within the last 6 months. Show the numbers by month.
-What is the trend of missed payments over the last 6 months.
-What is the channel-wise variation of this trend.
-What is the %age contribution to mortgage loans by area/ zip code.
-What is the contribution to the mortgage portfolio by various income categories.
-What is the contribution of prime and sub-prime loans to the mortgage portfolio.
-What is the state wise %age of total mortgage applications submitted over the last one year.
-How is the application submission growing for the states over the past 3 years.
-What is the conversion rate of the submitted applications by state.
