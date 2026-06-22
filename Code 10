@@ -1,0 +1,144 @@
+You are a Senior Data Architect specializing in SQL Server, Snowflake, Data Warehousing, and Migration Programs.
+
+I need to migrate a legacy SQL Server stored procedure to Snowflake.
+
+Before making any code changes, perform a complete analysis and create a migration plan.
+
+Provide the output in the following sections:
+
+1. Executive Summary
+   - Purpose of the procedure
+   - Business process supported
+   - Inputs and outputs
+
+2. Object Dependency Analysis
+   - Tables used
+   - Views used
+   - Stored procedures called
+   - Functions used
+   - Temporary tables
+   - Dynamic SQL usage
+
+3. Logic Breakdown
+   - Step-by-step explanation of every logical block
+   - Joins
+   - Filters
+   - Aggregations
+   - Updates/Inserts/Merges
+
+4. Migration Complexity Assessment
+   - Low/Medium/High complexity
+   - Reasons
+
+5. SQL Server Features Requiring Snowflake Conversion
+   - Temp tables
+   - Table variables
+   - Cursors
+   - TRY-CATCH
+   - MERGE statements
+   - Dynamic SQL
+   - Date functions
+   - Identity columns
+
+6. Snowflake Migration Strategy
+   - Recommended approach
+   - Required changes
+   - Potential risks
+
+7. Performance Improvement Opportunities
+   - Query optimization suggestions
+   - Join improvements
+   - Partitioning/Clustering recommendations
+   - Redundant processing
+
+8. Final Migration Plan
+   - Detailed implementation steps
+   - Ordered sequence of tasks
+
+Do not generate converted code yet.
+Wait for approval.
+
+Generate complete technical and business documentation for this stored procedure.
+
+Include:
+
+1. Business Purpose
+2. Data Flow Explanation
+3. Source Tables
+4. Target Tables
+5. Transformation Rules
+6. Join Logic
+7. Filtering Logic
+8. Aggregation Logic
+9. Output Description
+10. Assumptions
+11. Risks
+12. Data Lineage Diagram (ASCII format)
+
+Generate documentation suitable for:
+- Business Analysts
+- Data Engineers
+- Solution Architects
+
+Use professional enterprise documentation format.
+
+
+Convert this SQL Server stored procedure into Snowflake SQL.
+
+Requirements:
+
+1. Use Snowflake best practices.
+2. Replace SQL Server specific syntax.
+3. Convert temporary tables appropriately.
+4. Convert date functions.
+5. Convert error handling.
+6. Replace unsupported features.
+7. Preserve business logic exactly.
+8. Add comments explaining each converted section.
+
+Output:
+
+A. Conversion Summary
+B. SQL Server vs Snowflake Differences
+C. Complete Snowflake SQL Code
+D. Validation Checklist
+
+Act as a Snowflake Performance Architect.
+
+Review the converted Snowflake SQL and provide:
+
+1. Performance Bottlenecks
+2. Expensive Operations
+3. Join Optimization Opportunities
+4. Aggregation Improvements
+5. Clustering Key Recommendations
+6. Search Optimization Recommendations
+7. Warehouse Sizing Suggestions
+8. Query Refactoring Opportunities
+9. Cost Optimization Opportunities
+10. Expected Performance Improvement %
+
+Provide:
+- Current Issue
+- Recommendation
+- Expected Benefit
+- Implementation Complexity
+
+Create an executive migration report.
+
+Include:
+
+1. Current State Analysis
+2. Migration Challenges Identified
+3. Snowflake Readiness Score
+4. Estimated Manual Analysis Effort Saved
+5. Estimated Development Effort Saved
+6. Risks Mitigated
+7. Modernization Benefits
+8. Recommended Next Steps
+
+Present the output as a consulting-style report suitable for leadership review.
+
+Include quantified benefits where possible.
+
+Present results in a table.
