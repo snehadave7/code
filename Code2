@@ -1,108 +1,267 @@
-Neo4j PoC: Customer 360 & Relationship Discovery
-Objective
-Build a Customer 360 view that combines customer, account, card, address, phone, and transaction data to answer questions such as:
-Who are all related customers?
-Which customers share contact information?
-Which customers belong to the same household?
-Are there suspicious relationships indicating potential fraud?
-What is the complete relationship network around a customer?
-Source Tables (Can be CSV or RDBMS)
-1. CUSTOMER
-Customer_IDNameDOBPANCIFC001John Smith1985-01-01ABCDE1234FCIF1001C002Mary Smith1987-05-15FGHIJ5678KCIF1002
-2. ACCOUNT
-Account_IDCustomer_IDAccount_TypeStatusA1001C001SavingsActiveA1002C002CurrentActive
-3. CARD
-Card_IDCustomer_IDCard_TypeCR001C001CreditCR002C002Debit
-4. ADDRESS
-Address_IDAddress_LineCityADD00110 MG RoadDelhiADD00220 Park StreetNoida
-5. CUSTOMER_ADDRESS
-Customer_IDAddress_IDC001ADD001C002ADD001
-6. PHONE
-Phone_IDPhone_NumberP0019999999999P0028888888888
-7. CUSTOMER_PHONE
-Customer_IDPhone_IDC001P001C003P001
-8. EMAIL
-Email_IDEmailE001john@gmail.comE002mary@gmail.com
-9. CUSTOMER_EMAIL
-Customer_IDEmail_IDC001E001C002E002
-10. TRANSACTION
-Txn_IDAccount_IDAmountMerchantT001A10015000AmazonT002A10023000Flipkart
-Neo4j Graph Model
-Nodes
-(Customer)
-(Account)
-(Card)
-(Address)
-(Phone)
-(Email)
-(Transaction)
-Relationships
-(Customer)-[:OWNS]->(Account)
- 
-(Customer)-[:HAS_CARD]->(Card)
- 
-(Customer)-[:LIVES_AT]->(Address)
- 
-(Customer)-[:HAS_PHONE]->(Phone)
- 
-(Customer)-[:HAS_EMAIL]->(Email)
- 
-(Account)-[:PERFORMED]->(Transaction)
-Sample Customer 360 View
-Customer: John Smith
-    |
-    +-- Savings Account A1001
-    |
-    +-- Credit Card CR001
-    |
-    +-- Address ADD001
-    |
-    +-- Phone P001
-    |
-    +-- Email john@gmail.com
-    |
-    +-- Transactions
-Key Queries for Demo
-1. Complete Customer 360
-MATCH (c:Customer {customerId:'C001'})
-OPTIONAL MATCH (c)-[r]-(n)
-RETURN c,r,n
-2. Customers Sharing Same Address
-MATCH (c1:Customer)-[:LIVES_AT]->(a:Address)<-[:LIVES_AT]-(c2:Customer)
-WHERE c1.customerId <> c2.customerId
-RETURN c1.name,c2.name,a.addressLine
-Business Value
-Family identification
-Household segmentation
-Fraud detection
-3. Customers Sharing Phone Number
-MATCH (c1:Customer)-[:HAS_PHONE]->(p:Phone)<-[:HAS_PHONE]-(c2:Customer)
-WHERE c1 <> c2
-RETURN c1,c2,p
-Business Value
-Synthetic identity detection
-Mule account detection
-4. Related Customers Within 3 Hops
-MATCH p=(c:Customer {customerId:'C001'})-[*1..3]-(related)
-RETURN p
-5. Most Connected Customers
-MATCH (c:Customer)
-RETURN c.name,size((c)--()) as connections
-ORDER BY connections DESC
-Stretch Goal (Optional)
-Add:
-Merchant
-Merchant_IDMerchant_NameM001AmazonM002Flipkart
-Relationship:
-(Transaction)-[:AT]->(Merchant)
-Then identify:
-Customers transacting at same merchant
-which becomes useful for fraud analytics and recommendation engines.
-Expected PoC Deliverables
-Load 500–1000 records.
-Create graph model.
-Build 5–10 Cypher queries.
-Demonstrate Neo4j visualization.
-Compare a complex SQL join query vs Neo4j traversal query.
-Show a Customer 360 dashboard screenshot from Neo4j Browser.
-This PoC is typically achievable in 2–3 days and demonstrates graph traversal, relationship discovery, Customer 360, and fraud analytics in one compact example.
+-- ============================================================
+-- Procedure : SP_MASTER_TRANSFER_XREF_DAILY
+-- Database  : PENFED_RAW_PII
+-- Schema    : DBO
+-- Language  : Snowflake SQL Scripting
+-- Purpose   : Daily account transfer cross-reference loader for Bank 75.
+--             Builds full transfer chain ancestry and populates
+--             MASTER_TRANSFER_XREF_DAILY for yesterday's date.
+-- Migrated  : SQL Server → Snowflake
+-- ============================================================
+
+CREATE OR REPLACE PROCEDURE PTX_DB.L0_RAW_SCH.SP_MASTER_TRANSFER_XREF_DAILY()
+RETURNS VARCHAR
+LANGUAGE SQL
+AS
+$$
+DECLARE
+    -- Processing date variables
+    -- SQL Server: DECLARE @PeriodID VARCHAR(8) = CONVERT(VARCHAR(8),CAST(GETDATE()-1 AS DATE),112)
+    -- Snowflake : TO_VARCHAR with format string replaces CONVERT style codes
+    v_period_id     VARCHAR;   -- YYYYMMDD  e.g. 20240213
+    v_period_mth    VARCHAR;   -- YYYYMM    e.g. 202402
+    v_staging_table VARCHAR;   -- Fully qualified staging table name
+
+    -- Dynamic SQL strings
+    -- SQL Server: VARCHAR(MAX) → Snowflake VARCHAR (unbounded by default)
+    v_union_sql     VARCHAR;   -- UNION ALL of discovered source tables
+    v_creation_sql  VARCHAR;   -- CTAS statement for staging table
+    v_xref_sql      VARCHAR;   -- Recursive CTE + INSERT
+
+BEGIN
+
+    -- ============================================================
+    -- PHASE 0: Compute Date Variables
+    -- ============================================================
+    -- SQL Server: CONVERT(VARCHAR(8), CAST(GETDATE()-1 AS DATE), 112)
+    -- Snowflake : TO_VARCHAR(DATEADD('day',-1,CURRENT_DATE()), 'YYYYMMDD')
+    -- Note: GETDATE()-1 → DATEADD('day',-1,CURRENT_DATE())
+    --       CONVERT style 112 → TO_VARCHAR format 'YYYYMMDD'
+    --       VARCHAR(6) truncation → explicit 'YYYYMM' format string
+    v_period_id     := TO_VARCHAR(DATEADD('day', -1, CURRENT_DATE()), 'YYYYMMDD');
+    v_period_mth    := TO_VARCHAR(DATEADD('day', -1, CURRENT_DATE()), 'YYYYMM');
+    v_staging_table := 'PTX_DB.L0_RAW_SCH.RAW_TRANSFER_DAILY_TEMP_' || v_period_id;
+
+
+    -- ============================================================
+    -- PHASE 1: Discover Source Tables and Build UNION ALL SQL
+    -- ============================================================
+    -- SQL Server: SELECT @UnionStatement = @UnionStatement + ... (undocumented string accumulation)
+    --             ORDER BY did not guarantee sequence with variable assignment
+    -- Snowflake : LISTAGG(...) WITHIN GROUP (ORDER BY TABLE_NAME) — deterministic and correct
+    SELECT
+        LISTAGG(
+            'SELECT TO_NUMBER(SUBSTRING(TABLE_NAME, 14, 8)) AS PERIOD_DATE, * FROM '
+            || TABLE_CATALOG || '.' || TABLE_SCHEMA || '.' || TABLE_NAME,
+            ' UNION ALL '
+        ) WITHIN GROUP (ORDER BY TABLE_NAME)
+    INTO v_union_sql
+    FROM PENFED_RAW_PII.INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_NAME LIKE 'RAW_TRANSFER_' || :v_period_id || '_BANK75';
+
+    -- Guard: exit cleanly if no source table found for this period
+    -- SQL Server had no such guard — it would fail silently with a NULL EXEC string
+    IF (v_union_sql IS NULL OR LENGTH(v_union_sql) = 0) THEN
+        RETURN 'WARNING: No source table found for period ' || v_period_id
+               || '. Procedure aborted.';
+    END IF;
+
+
+    -- ============================================================
+    -- PHASE 2: Create Staging Table (CTAS)
+    -- ============================================================
+    -- SQL Server: IF OBJECT_ID(...,'U') IS NOT NULL DROP TABLE + SELECT ... INTO with IDENTITY
+    --             followed by ALTER TABLE REBUILD PARTITION = ALL WITH (DATA_COMPRESSION = PAGE)
+    -- Snowflake : CREATE OR REPLACE TEMPORARY TABLE ... AS SELECT ROW_NUMBER()
+    --             ALTER TABLE REBUILD and DATA_COMPRESSION removed — Snowflake handles automatically
+    --             TEMPORARY TABLE is session-scoped and auto-dropped on session end (safer than original)
+    v_creation_sql :=
+        'CREATE OR REPLACE TEMPORARY TABLE ' || v_staging_table || ' AS
+         SELECT
+
+             -- SQL Server IDENTITY(INT,1,1) → ROW_NUMBER() OVER (...) in CTAS
+             -- Used in Anchor 2 to detect same-day transfer destinations
+             ROW_NUMBER() OVER (ORDER BY A.CHD_ACCOUNT_NUMBER_NEW, A.CHD_ACCOUNT_NUMBER_OLD)
+                 AS TRANSFER_UNIQUE_ID,
+
+             -- Literal period date as integer column
+             ' || v_period_id || '::INTEGER AS PERIOD_ID,
+
+             -- AccountId_New: bank prefix 750000000000000000 + numeric account number
+             -- SQL Server: ISNUMERIC() + REPLICATE(''0'',16) + ISNULL()
+             -- Snowflake : TRY_TO_NUMBER() + REPEAT(''0'',16) + COALESCE()
+             --   TRY_TO_NUMBER is safer than ISNUMERIC (no false positives for ''$'', ''1e2'', etc.)
+             --   LTRIM(RTRIM()) → TRIM()
+             --   ISNULL() → COALESCE()
+             COALESCE(
+                 CASE
+                     WHEN TRY_TO_NUMBER(TRIM(A.CHD_ACCOUNT_NUMBER_NEW)) IS NOT NULL
+                          AND TRIM(A.CHD_ACCOUNT_NUMBER_NEW) NOT IN (''.'', '''')
+                     THEN (750000000000000000
+                           + TRY_TO_NUMBER(TRIM(A.CHD_ACCOUNT_NUMBER_NEW)))::NUMBER(18,0)
+                     ELSE NULL
+                 END,
+                 0
+             )::NUMBER(18,0) AS ACCOUNT_ID_NEW,
+
+             -- AccountId_Old: identical formula applied to old account number
+             COALESCE(
+                 CASE
+                     WHEN TRY_TO_NUMBER(TRIM(A.CHD_ACCOUNT_NUMBER_OLD)) IS NOT NULL
+                          AND TRIM(A.CHD_ACCOUNT_NUMBER_OLD) NOT IN (''.'', '''')
+                     THEN (750000000000000000
+                           + TRY_TO_NUMBER(TRIM(A.CHD_ACCOUNT_NUMBER_OLD)))::NUMBER(18,0)
+                     ELSE NULL
+                 END,
+                 0
+             )::NUMBER(18,0) AS ACCOUNT_ID_OLD,
+
+             A.*
+
+         FROM (' || v_union_sql || ') A
+
+         -- Filter: individual cardholder accounts only, exclude corporate cards
+         -- SQL Server: LTRIM(RTRIM(A.COMPANY_CARD)) = ''N''
+         -- Snowflake : TRIM(A.COMPANY_CARD) = ''N''
+         WHERE TRIM(A.COMPANY_CARD) = ''N''';
+
+    -- SQL Server: EXEC (@CreationStatement)
+    -- Snowflake : EXECUTE IMMEDIATE :variable
+    EXECUTE IMMEDIATE :v_creation_sql;
+
+
+    -- ============================================================
+    -- PHASE 3A: Period Purge
+    -- ============================================================
+    -- Logic unchanged: delete current period before re-inserting
+    -- Makes the procedure re-runnable for the same processing date
+    -- Note: this DELETE and the INSERT below are still not in an explicit
+    --       transaction. Add BEGIN TRANSACTION / COMMIT if required.
+    DELETE FROM PTX_DB.L0_RAW_SCH.MASTER_TRANSFER_XREF_DAILY
+    WHERE PERIOD_ID = :v_period_id::INTEGER;
+
+
+    -- ============================================================
+    -- PHASE 3B: Recursive CTE + INSERT
+    -- ============================================================
+    -- SQL Server: WITH Tree AS (...)  — RECURSIVE keyword not required
+    -- Snowflake : WITH RECURSIVE TREE AS (...) — RECURSIVE keyword is required
+    -- Three-member CTE structure preserved exactly:
+    --   Anchor 1  → extend existing chains from prior months
+    --   Anchor 2  → identify new chain roots
+    --   Recursive → intra-period chain traversal (A→B and B→C same day)
+    v_xref_sql :=
+        'INSERT INTO PTX_DB.L0_RAW_SCH.MASTER_TRANSFER_XREF_DAILY
+             (BANK_ID, PERIOD_ID, BANK_PERIOD, PARENT_ACCOUNT_ID,
+              ACCOUNT_ID_OLD, ACCOUNT_ID_NEW, CHD_ACCT_TRANSFER_DATE)
+
+         WITH RECURSIVE TREE AS (
+
+             -- Anchor 1: Transfers linked to existing parent accounts
+             -- Inherits ParentAccountID from historical xref where today''s old account
+             -- was previously a known transfer destination
+             SELECT
+                 A.PARENT_ACCOUNT_ID,
+                 A.ACCOUNT_ID_NEW    AS ACCOUNT_ID_OLD,
+                 B.ACCOUNT_ID_NEW,
+                 B.CHD_ACCT_TRANSFER_DATE
+             FROM PTX_DB.L0_RAW_SCH.MASTER_TRANSFER_XREF_DAILY A
+             INNER JOIN ' || v_staging_table || ' B
+                 ON A.ACCOUNT_ID_NEW = B.ACCOUNT_ID_OLD
+             -- PRESERVED: YYYYMMDD integer compared against YYYYMM integer
+             -- Intentional boundary: excludes current-month historical records
+             -- (e.g. 20240213 > 202402, so current month rows are excluded)
+             WHERE A.PERIOD_ID < ' || v_period_mth || '
+
+             UNION ALL
+
+             -- Anchor 2: Transfers with new parent accounts (chain roots)
+             -- Qualifies as root only if:
+             --   (a) old account has no prior parent in xref  AND
+             --   (b) old account is not a same-day transfer destination
+             SELECT
+                 A.ACCOUNT_ID_OLD    AS PARENT_ACCOUNT_ID,
+                 A.ACCOUNT_ID_OLD,
+                 A.ACCOUNT_ID_NEW,
+                 A.CHD_ACCT_TRANSFER_DATE
+             FROM ' || v_staging_table || ' A
+             LEFT JOIN PTX_DB.L0_RAW_SCH.MASTER_TRANSFER_XREF_DAILY B
+                 ON A.ACCOUNT_ID_OLD = B.ACCOUNT_ID_NEW
+             LEFT JOIN ' || v_staging_table || ' C
+                 ON A.ACCOUNT_ID_OLD = C.ACCOUNT_ID_NEW
+             WHERE B.PARENT_ACCOUNT_ID IS NULL
+               AND C.TRANSFER_UNIQUE_ID IS NULL
+
+             UNION ALL
+
+             -- Recursive member: multiple transfers within a single period
+             -- Extends chains where A→B and B→C both occur today
+             -- propagates the same PARENT_ACCOUNT_ID through A→B→C
+             SELECT
+                 P.PARENT_ACCOUNT_ID,
+                 P.ACCOUNT_ID_NEW    AS ACCOUNT_ID_OLD,
+                 C.ACCOUNT_ID_NEW,
+                 C.CHD_ACCT_TRANSFER_DATE
+             FROM TREE P
+             INNER JOIN ' || v_staging_table || ' C
+                 ON P.ACCOUNT_ID_NEW = C.ACCOUNT_ID_OLD
+         )
+
+         SELECT
+             75                              AS BANK_ID,
+             ' || v_period_id || '::INTEGER  AS PERIOD_ID,
+             -- SQL Server: ''75''+@PeriodMTH → concatenated integer e.g. 75202402
+             75' || v_period_mth || '::INTEGER AS BANK_PERIOD,
+             TREE.PARENT_ACCOUNT_ID,
+             TREE.ACCOUNT_ID_OLD,
+             TREE.ACCOUNT_ID_NEW,
+             TREE.CHD_ACCT_TRANSFER_DATE
+         FROM TREE
+         -- Anti-join deduplication: skip pairs already in target
+         -- SQL Server != → Snowflake <> (ANSI standard)
+         LEFT JOIN PTX_DB.L0_RAW_SCH.MASTER_TRANSFER_XREF_DAILY MTX
+             ON TREE.ACCOUNT_ID_OLD = MTX.ACCOUNT_ID_OLD
+            AND TREE.ACCOUNT_ID_NEW = MTX.ACCOUNT_ID_NEW
+         WHERE MTX.ACCOUNT_ID_OLD IS NULL';
+
+    EXECUTE IMMEDIATE :v_xref_sql;
+
+
+    -- ============================================================
+    -- PHASE 4: Drop Staging Table
+    -- ============================================================
+    -- SQL Server: IF OBJECT_ID(''...table...'',''U'') IS NOT NULL DROP TABLE
+    -- Snowflake : DROP TABLE IF EXISTS — simpler, no OBJECT_ID function needed
+    EXECUTE IMMEDIATE 'DROP TABLE IF EXISTS ' || v_staging_table;
+
+    RETURN 'SUCCESS: Period ' || v_period_id || ' processed.';
+
+
+-- ============================================================
+-- ERROR HANDLING
+-- New addition — the original SQL Server procedure had no TRY/CATCH
+-- On any failure: clean up the orphaned staging table, then re-raise
+-- ============================================================
+EXCEPTION
+    WHEN OTHER THEN
+        EXECUTE IMMEDIATE 'DROP TABLE IF EXISTS ' || v_staging_table;
+        RAISE;
+
+END;
+$$;
+
+
+-- ============================================================
+-- EXECUTION
+-- ============================================================
+-- Manual run:
+--   CALL PTX_DB.L0_RAW_SCH.SP_MASTER_TRANSFER_XREF_DAILY();
+
+-- Schedule via Snowflake Task (runs daily at 06:00 AM EST):
+--   CREATE OR REPLACE TASK PTX_DB.L0_RAW_SCH.TASK_MASTER_TRANSFER_XREF_DAILY
+--       WAREHOUSE = <your_warehouse>
+--       SCHEDULE  = 'USING CRON 0 6 * * * America/New_York'
+--   AS
+--       CALL PTX_DB.L0_RAW_SCH.SP_MASTER_TRANSFER_XREF_DAILY();
+--
+--   ALTER TASK PTX_DB.L0_RAW_SCH.TASK_MASTER_TRANSFER_XREF_DAILY RESUME;
