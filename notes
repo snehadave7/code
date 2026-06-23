@@ -98,3 +98,27 @@ Create the following files automatically:
 4. performance_recommendations.md
 5. migration_summary.md
 
+1) Validate the recursive CTE syntax in SP_MASTER_TRANSFER_XREF_DAILY_OPTIMIZED.
+
+Snowflake may not allow:
+
+WITH raw_union AS (...),
+staged AS (...),
+RECURSIVE tree AS (...)
+
+Verify against Snowflake syntax rules and provide corrected code if necessary.
+
+
+2) Review all DELETE, INSERT and WHERE predicates.
+
+Ensure period_id comparisons use explicit datatype conversion.
+
+Replace implicit VARCHAR-to-NUMBER conversions with explicit TO_NUMBER().
+
+3)Review INFORMATION_SCHEMA.TABLES query.
+
+Validate table name matching logic.
+
+Ensure case sensitivity issues cannot prevent table discovery.
+
+Use UPPER() where required.
