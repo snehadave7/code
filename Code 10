@@ -1,23 +1,19 @@
-Use Case 2: Banking Data Quality Rule Generator
+Use Case 3: Automated Data Product Documentation
 
-Objective Generate data quality checks from table metadata of PaymatiX.
+Objective Generate business and technical documentation automatically, for use case 2 tables
 
-Scenario Provide a customer/account/transaction table schema and ask Cursor AI to generate:
+Scenario Provide:
 
-Null checks
-Duplicate checks
-Referential integrity checks
-Business validation rules
-SQL test scripts
-Demo Deliverables
-Input schema
-Generated DQ rules
-Generated SQL validation scripts
-Test execution examples
-Impact Every bank struggles with data quality. This demo is easy to understand and immediately relevant.
+Table DDL
+Sample ETL logic
+Few business requirements
+Use Cursor AI to generate:
+Source-to-target mapping
+Data dictionary
+Technical design document
+Business glossary
+Lineage description
 Expected Benefit
 
-Significant reduction in manual DQ rule creation effort
-
-
-PERIODID,PERIODDATE,CLIENTNUMBER,M2_SYSTEM,M2_PRIN,M2_AGENT,RECORD_ID,M2_PRTF_TYPE_CD,M2_ACCT_OPEN_DT,M2_CRDT_LIMT_AM,M2_HIGH_CRDT_AM,M2_SCHD_MNTH_PYMN_AM,M2_CRRN_BAL_AM,M2_PAST_DUE_AM,M2_CLSD_DT,M2_LAST_PYMN_DT,BRTH_YEAR,M2_ECOA_CD,M2_ZIP_CD,SEND_TU,LOAD_DATE,LOADED_BY
+60-80% reduction in documentation effort
+Better governance and onboarding
