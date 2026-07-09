@@ -1,1 +1,62 @@
-I need to create an agent that will automatically perform everything that is mentioned in the @ruleset.md  for any type of table, data. I want to make the whole process generic so that whenever i add new table data and its schema it will perform all the dq checks and then in another file load all the failed records. After this run the data quality checks on the data to clean them up and again check if the failed records are now decreased or not. Also i have GPT-4o-mini keys so leave the space for adding the keys for llm.
+You are a Senior Banking Data Quality Engineer.
+Automatically infer the appropriate data quality rules based on the metadata and values present in the dataset.
+Perform a complete banking data quality assessment. Generate DQ rules and SQL validation scripts as well.
+
+Your analysis should include:
+1. Null value analysis
+   - includes empty spaces also
+   - Count nulls
+   - Percentage
+2. Duplicate analysis
+   - Detect duplicate rows
+   - Detect duplicate business keys
+3. Data type validation
+   - Date format is 'yymmdd'
+   - Invalid dates
+   - Invalid numeric fields
+   - Invalid text values
+4. Date validation
+   - Future dates
+   - Open date after close date
+   - Payment date before account open date
+5. Business rule validation
+Infer logical business rules such as
+- Current Balance should not exceed Credit Limit
+- Past Due should not exceed Current Balance
+- Closed accounts should not have balance
+- Scheduled Payment should not be negative
+- Credit Limit should be positive
+6. Generate a professional Data Quality Report.
+The report should contain
+
+------------------------------------------------
+
+Executive Summary
+Total Records
+Total Passed
+Total Failed
+Overall Data Quality Score
+Critical Issues
+Warning Issues
+
+------------------------------------------------
+
+For every rule provide
+Rule Name
+Status (PASS / FAIL)
+Records Failed
+Failure Percentage
+Reason
+Example Failed Records
+Recommended Fix
+
+------------------------------------------------
+
+Finally provide
+Overall Risk Level
+Priority fixes
+Business Impact
+Generate the report in markdown.
+
+
+So generate one report with all the analysis for a non-technical person to understand, one for a technical person with all technical details. And generate DQ rules and validation scripts for future refrences so that it can be run and all checks can be performed.
